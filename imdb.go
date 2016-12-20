@@ -86,7 +86,7 @@ func stringNode(n *html.Node) string {
 		n.DataAtom, scrape.Attr(n, "id"), scrape.Attr(n, "class"), firstN(scrape.Text(n), 60))
 }
 
-func main() {
+func oldMain() {
 	fmt.Print("> Actor name: ")
 	var input string
 	//fmt.Scanln(&input)
