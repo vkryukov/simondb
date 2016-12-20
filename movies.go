@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/csv"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -77,6 +78,8 @@ func ParseOriginalDB(filename string) (Movies, Actors, error) {
 		m.Studio = record[2]
 		m.Year = parseYear(record[3])
 		m.Duration = parseDuration(record[4])
+		m.Kassette = record[5]
+		m.DVD = record[6]
 
 		actorsNames := strings.Split(record[1], ",")
 		for _, a := range actorsNames {
@@ -84,6 +87,7 @@ func ParseOriginalDB(filename string) (Movies, Actors, error) {
 			if actor, ok := actors[a]; ok {
 				// Actor is found, so we just need to add the MovieID to the list
 				actor.Movies = append(actor.Movies, m.ID)
+				m.Actors = append(m.Actors, actor.ID)
 			} else {
 				// Need to create a new actor
 				maxActorID += 1
@@ -91,8 +95,11 @@ func ParseOriginalDB(filename string) (Movies, Actors, error) {
 				actors[a].Name = a
 				actors[a].ID = maxActorID
 				actors[a].Movies = []int{m.ID}
+				m.Actors = append(m.Actors, actors[a].ID)
 			}
 		}
+		movies = append(movies, m)
+
 	}
 
 	var actorsList Actors
@@ -119,4 +126,118 @@ func parseDuration(s string) int {
 		return -1
 	}
 	return int(i)
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02 03:04:05")
+}
+
+func (movies Movies) Len() int {
+	return len(movies)
+}
+
+func (movies Movies) Swap(i, j int) {
+	movies[i], movies[j] = movies[j], movies[i]
+}
+
+func (movies Movies) Less(i, j int) bool {
+	return movies[i].Title < movies[j].Title
+}
+
+// WriteCSV writes movies to disk as a CSV file
+func (movies Movies) WriteCSV(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	writer := csv.NewWriter(file)
+	// Header
+	writer.Write([]string{
+		"ID", "Title", "Studio", "Year", "Duration", "Actors",
+		"Kassette", "DVD", "imdbID", "imdbTitle", "imdbStudio",
+		"imdbYear", "imdbDuration", "updated",
+	})
+	if writer.Error() != nil {
+		return writer.Error()
+	}
+	sort.Sort(movies)
+	for _, m := range movies {
+		var actors []string
+		for _, a := range m.Actors {
+			actors = append(actors, strconv.Itoa(a))
+		}
+		writer.Write([]string{
+			strconv.Itoa(m.ID),
+			m.Title,
+			m.Studio,
+			strconv.Itoa(m.Year),
+			strconv.Itoa(m.Duration),
+			strings.Join(actors, " : "),
+			m.Kassette,
+			m.DVD,
+			m.imdbID,
+			m.imdbTitle,
+			m.imdbStudio,
+			strconv.Itoa(m.imdbYear),
+			strconv.Itoa(m.imdbDuration),
+			formatTime(m.updated),
+		})
+		if writer.Error() != nil {
+			return writer.Error()
+		}
+	}
+	writer.Flush()
+	return writer.Error()
+}
+
+func (actors Actors) Len() int {
+	return len(actors)
+}
+
+func (actors Actors) Swap(i, j int) {
+	actors[i], actors[j] = actors[j], actors[i]
+}
+
+func (actors Actors) Less(i, j int) bool {
+	return actors[i].Name < actors[j].Name
+}
+
+// WriteCSV writes actors to disk as a CSV file
+func (actors Actors) WriteCSV(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	writer := csv.NewWriter(file)
+	// Header
+	writer.Write([]string{
+		"ID", "Name", "Movies",
+		"imdbID", "imdbName", "updated",
+	})
+	if writer.Error() != nil {
+		return writer.Error()
+	}
+	sort.Sort(actors)
+	for _, a := range actors {
+		var movies []string
+		for _, m := range a.Movies {
+			movies = append(movies, strconv.Itoa(m))
+		}
+		writer.Write([]string{
+			strconv.Itoa(a.ID),
+			a.Name,
+			strings.Join(movies, ","),
+			a.imdbID,
+			a.imdbName,
+			formatTime(a.updated),
+		})
+		if writer.Error() != nil {
+			return writer.Error()
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
