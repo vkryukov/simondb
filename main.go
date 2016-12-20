@@ -3,7 +3,7 @@ package main
 const originalDBName = "./simondb.csv"
 
 func main() {
-	movies, actors, err := ParseOriginalDB(originalDBName)
+	movies, actors, _, err := ParseOriginalDB(originalDBName)
 	if err != nil {
 		panic(err)
 	}

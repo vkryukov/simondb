@@ -47,27 +47,37 @@ type Actor struct {
 	updated time.Time // last it was updated from IMDB
 }
 
+// MovieActor holds Movie <> Actor relationship
+type MovieActor struct {
+	MovieID int
+	ActorID int
+}
+
 // Movies hold all the movies in memory
 type Movies []*Movie
 
 // Actors hold all the actors in memory
 type Actors []*Actor
 
+// MoviesActors hold all the movies / actors relationships
+type MoviesActors []*MovieActor
+
 // Serializing and de-serializing to/from disk
 
 // ParseOriginalDB reads Simon's original file, and creates Actors and Movies collections
-func ParseOriginalDB(filename string) (Movies, Actors, error) {
+func ParseOriginalDB(filename string) (Movies, Actors, MoviesActors, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	records, err := csv.NewReader(file).ReadAll()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var movies Movies
+	var moviesActors MoviesActors
 	actors := make(map[string]*Actor)
 	maxActorID := 0
 	for i, record := range records[1:] { // Skiping the headline
@@ -88,6 +98,7 @@ func ParseOriginalDB(filename string) (Movies, Actors, error) {
 				// Actor is found, so we just need to add the MovieID to the list
 				actor.Movies = append(actor.Movies, m.ID)
 				m.Actors = append(m.Actors, actor.ID)
+				moviesActors = append(moviesActors, &MovieActor{MovieID: m.ID, ActorID: actor.ID})
 			} else {
 				// Need to create a new actor
 				maxActorID += 1
@@ -95,7 +106,8 @@ func ParseOriginalDB(filename string) (Movies, Actors, error) {
 				actors[a].Name = a
 				actors[a].ID = maxActorID
 				actors[a].Movies = []int{m.ID}
-				m.Actors = append(m.Actors, actors[a].ID)
+				m.Actors = append(m.Actors, maxActorID)
+				moviesActors = append(moviesActors, &MovieActor{MovieID: m.ID, ActorID: maxActorID})
 			}
 		}
 		movies = append(movies, m)
@@ -106,7 +118,7 @@ func ParseOriginalDB(filename string) (Movies, Actors, error) {
 	for _, v := range actors {
 		actorsList = append(actorsList, v)
 	}
-	return movies, actorsList, nil
+	return movies, actorsList, moviesActors, nil
 }
 
 // We expect properly parsed years, and return -1 on errors
